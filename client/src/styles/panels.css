@@ -43,10 +43,45 @@
     inset 0 -3px 0 rgba(0, 0, 0, 0.12);
 }
 
-.panel-note {
-  margin: 3px 0 0;
-  color: var(--text-muted);
+/* The heading sits on the icon's centre line, its info button beside it. */
+.panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+/* A small ink-ringed coin. Hover and the open state only change its fill. */
+.info-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-solid);
+  color: var(--text-secondary);
+  cursor: help;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+
+.info-button:hover,
+.info-button[aria-expanded="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Wider than the pointer tooltip: it holds a paragraph, not a readout. */
+.tooltip.info-tip {
+  width: min(340px, calc(100vw - 16px));
+}
+
+.info-tip .tooltip-inner {
   font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
 }
 
 /* Refetch holds the previous render rather than flashing a skeleton. */

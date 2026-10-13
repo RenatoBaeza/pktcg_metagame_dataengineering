@@ -86,7 +86,7 @@ export default function App() {
             <Panel
               icon={<GridIcon />}
               title={t("matchups")}
-              note={t("matchupNote")}
+              info={t("matchupNote")}
             >
               <div className={fade}>
                 {!decks.data || !matrix.data ? (
@@ -102,7 +102,7 @@ export default function App() {
             <Panel
               icon={<StackIcon />}
               title={t("decksTitle")}
-              note={t("deckNote")}
+              info={t("deckNote")}
             >
               <div className={fade}>
                 {decks.data ? (

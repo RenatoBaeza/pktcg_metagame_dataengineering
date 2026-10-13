@@ -25,6 +25,7 @@ export const en = {
   emptyData: "No tournament data is available yet. Please check back later.",
   matchups: "Matchups",
   matchupNote: "Each cell is the row deck’s score rate against the column deck, counting a tie as half a win. The 50 most played decks, every pairing that met at least once; a faded cell is too thin to call either way. Click a column’s icon to rank every deck against it; click again to flip, a third time to restore. Click any deck to see it against the field.",
+  aboutPanel: "What this shows",
   decksTitle: "Decks",
   deckNote: "Score rate counts a tie as half a win, so it and the excluding-ties column differ by a point or two. Both are over non-mirror matches only. Click a column to re-sort.",
   dataSource: "Data from the Limitless TCG API",

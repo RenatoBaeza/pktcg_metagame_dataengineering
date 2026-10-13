@@ -25,6 +25,7 @@ export const es = {
   emptyData: "Aún no hay datos de torneos disponibles. Vuelve a consultar más tarde.",
   matchups: "Enfrentamientos",
   matchupNote: "Cada celda muestra el porcentaje de puntos del mazo de la fila contra el de la columna; cada empate cuenta como media victoria. Se muestran los 50 mazos más jugados y todo enfrentamiento con al menos una partida; una celda atenuada tiene muy pocas partidas para inclinarse hacia un lado. Haz clic en el icono de una columna para ordenar los mazos contra ese rival; otra vez para invertir y una tercera para restaurar. Selecciona un mazo para ver sus resultados contra los demás.",
+  aboutPanel: "Qué muestra esto",
   decksTitle: "Mazos",
   deckNote: "El porcentaje de puntos cuenta cada empate como media victoria, por lo que difiere ligeramente de la columna sin empates. Ambos excluyen las partidas entre mazos iguales. Selecciona una columna para ordenar.",
   dataSource: "Datos de la API de Limitless TCG",

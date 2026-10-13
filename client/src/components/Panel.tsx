@@ -1,26 +1,30 @@
 import { useI18n } from "../i18n";
 import type { ReactNode } from "react";
 import { useReveal } from "../fx/motion";
+import { InfoTip } from "./InfoTip";
 
 /**
  * A framed card with a heading, drawn like a game menu window. Rises into
  * place the first time it scrolls into view, and otherwise holds still.
+ * `info` is the panel's explanation, kept behind an info button beside the
+ * heading rather than printed under it.
  */
 export function Panel({
   title,
-  note,
+  info,
   icon,
   actions,
   children,
   className,
 }: {
   title: ReactNode;
-  note?: ReactNode;
+  info?: ReactNode;
   icon?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const { t } = useI18n();
   const ref = useReveal<HTMLElement>();
 
   return (
@@ -32,9 +36,9 @@ export function Panel({
               {icon}
             </span>
           )}
-          <div>
+          <div className="panel-heading">
             <h2>{title}</h2>
-            {note && <p className="panel-note">{note}</p>}
+            {info && <InfoTip label={t("aboutPanel")}>{info}</InfoTip>}
           </div>
         </div>
         {actions}
