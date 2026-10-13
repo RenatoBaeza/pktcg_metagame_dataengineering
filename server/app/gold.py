@@ -18,12 +18,15 @@ period, not the tournament:
                     into each deck's record, so it runs after them.
     trend_decks     the trend axis: the 'all' period's TREND_DECKS most played
                     decks. Reads deck_stats, so it runs after them.
-    matchup_trends  one call per grain (week, month): every matchup between
-                    two trend decks, per calendar bucket.
+    matchup_trends  every matchup between two trend decks, per calendar bucket.
+                    One call per grain (week, month) and calendar month of
+                    bucket starts: a whole weekly grain is ~75k rows, too many
+                    to write inside the timeout in one statement.
 """
 
 import argparse
 import sys
+from datetime import date, timedelta
 from typing import Any
 
 import httpx2 as httpx
@@ -37,7 +40,8 @@ SETUP_STEPS = ("periods", "decks")
 # Run once per period, in this order.
 PERIOD_STEPS = ("matchup_stats", "deck_stats")
 
-# Run after every period step: trend_decks once, matchup_trends once per grain.
+# Run after every period step: trend_decks once, matchup_trends once per grain
+# and month of the window.
 TREND_STEPS = ("trend_decks", "matchup_trends")
 
 STEPS = SETUP_STEPS + PERIOD_STEPS + TREND_STEPS
@@ -104,6 +108,45 @@ def periods(client: httpx.Client, base: str, hdrs: dict[str, str]) -> list[str]:
     return [row["period"] for row in response.json()]
 
 
+def trend_ranges(
+    client: httpx.Client, base: str, hdrs: dict[str, str]
+) -> list[tuple[str, str | None, str | None]]:
+    """The bucket-start ranges to refresh the trends in: one calendar month of
+    the 'all' window each, as (label, p_from, p_to).
+
+    The first range is open at the start and the last at the end, so a bucket
+    that starts before the window's first month (a week straddling it) or
+    after its last still belongs to exactly one call. With no window resolved
+    yet it is a single open range - the whole grain in one call.
+    """
+    response = supabase._send(
+        client,
+        "GET",
+        f"{base}/rest/v1/{PERIODS_TABLE}",
+        params={"select": "date_from,date_to", "period": "eq.all"},
+        headers=hdrs,
+    )
+    response.raise_for_status()
+    rows = response.json() or []
+    if not rows or not rows[0].get("date_from") or not rows[0].get("date_to"):
+        return [("all", None, None)]
+
+    first = date.fromisoformat(rows[0]["date_from"]).replace(day=1)
+    last = date.fromisoformat(rows[0]["date_to"]).replace(day=1)
+    months = [first]
+    while months[-1] < last:
+        months.append((months[-1] + timedelta(days=32)).replace(day=1))
+
+    return [
+        (
+            month.strftime("%Y-%m"),
+            None if i == 0 else month.isoformat(),
+            None if i == len(months) - 1 else (months[i + 1] - timedelta(days=1)).isoformat(),
+        )
+        for i, month in enumerate(months)
+    ]
+
+
 def run(args: argparse.Namespace) -> int:
     steps = [step for step in STEPS if not args.only or step in args.only]
 
@@ -148,7 +191,14 @@ def run(args: argparse.Namespace) -> int:
             elif step == "trend_decks":
                 calls = [(step, {"p_top": TREND_DECKS})]
             elif step == "matchup_trends":
-                calls = [(f"{step}[{grain}]", {"p_grain": grain}) for grain in GRAINS]
+                # Read here, not up front: the periods step may just have
+                # moved the window.
+                ranges = trend_ranges(client, base, hdrs)
+                calls = [
+                    (f"{step}[{grain} {label}]", {"p_grain": grain, "p_from": lo, "p_to": hi})
+                    for grain in GRAINS
+                    for label, lo, hi in ranges
+                ]
             else:
                 calls = [(f"{step}[{period}]", {"p_period": period}) for period in scope]
 

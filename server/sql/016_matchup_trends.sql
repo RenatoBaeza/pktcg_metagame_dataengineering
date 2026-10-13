@@ -44,9 +44,18 @@
 -- the client mutes any cell whose interval still spans 50%, exactly as the
 -- matrix does, rather than hiding it behind a cutoff.
 --
--- The weekly aggregate ran in 1.2s, so each grain is one RPC inside the 8s
--- PostgREST statement timeout - but only because the Wilson interval is
--- computed inline, in double precision. Calling wilson_interval() per cell,
+-- Each call refreshes one range of buckets, not a whole grain, to stay inside
+-- the 8s PostgREST statement timeout. A whole grain was one call at first:
+-- monthly took 4.4s, but weekly's 75k rows timed out on the write alone (about
+-- 100us a row, both directions, two indexes and the foreign key). app/gold.py
+-- now passes one calendar month of bucket starts per call (p_from, p_to), so
+-- a weekly call writes ~12k rows and scans only that month's tournaments.
+-- Every call also deletes the buckets the window has moved past, so the
+-- grain still ends each run as a full reconcile. A call with no range is the
+-- whole grain, which is what refresh_gold() below uses.
+--
+-- The aggregate itself is cheap only because the Wilson interval is computed
+-- inline, in double precision. Calling wilson_interval() per cell,
 -- as gold_matchup_stats does for its ~11k, took the weekly grain's 75k cells
 -- to 7.0s: the function's `set search_path` stops the planner inlining it, so
 -- every cell paid a full function call, and its numeric arithmetic was most of
@@ -58,9 +67,11 @@
 --
 --   refresh_gold_trend_decks(p_top)       reads gold_deck_stats ('all'), so it
 --                                         needs that period's deck_stats first.
---   refresh_gold_matchup_trends(p_grain)  one call per grain. Writes the
---                                         buckets, then the cells, then the
---                                         bucket totals from those cells.
+--   refresh_gold_matchup_trends(p_grain, p_from, p_to)
+--                                         one call per grain and month of
+--                                         bucket starts. Writes the buckets,
+--                                         then the cells, then the bucket
+--                                         totals from those cells.
 --
 -- refresh_gold() below is the one-call rebuild for a SQL session. It is
 -- recreated here to run the trend steps too, and because it predated sql/015
@@ -118,9 +129,8 @@ alter table public.gold_trend_decks    enable row level security;
 alter table public.gold_trend_buckets  enable row level security;
 alter table public.gold_matchup_trends enable row level security;
 
--- Created only when missing rather than dropped and recreated: the Supabase
--- MCP holds any DROP for a confirmation that never arrives, so this file
--- carries none.
+-- Created only when missing rather than dropped and recreated, so re-running
+-- the file never leaves a table briefly without its policy.
 do $do$
 declare
     t text;
@@ -161,7 +171,15 @@ begin
 end;
 $fn$;
 
-create or replace function public.refresh_gold_matchup_trends(p_grain text)
+-- The signature grew a bucket range, so the one-argument version has to go or
+-- a call naming only p_grain would have two candidates.
+drop function if exists public.refresh_gold_matchup_trends(text);
+
+create or replace function public.refresh_gold_matchup_trends(
+    p_grain text,
+    p_from date default null,
+    p_to date default null
+)
 returns bigint
 language plpgsql
 security invoker
@@ -174,6 +192,8 @@ declare
     v_to date;
     v_min integer;
     v_step interval;
+    v_lo date;
+    v_hi date;
 begin
     if p_grain is null or p_grain not in ('week', 'month') then
         raise exception 'unknown trend grain: %', p_grain;
@@ -187,11 +207,22 @@ begin
         raise exception 'gold period ''all'' is missing';
     end if;
 
-    -- Cascades to the grain's cells.
-    delete from public.gold_trend_buckets b where b.grain = p_grain;
+    -- Buckets the window has moved past, whichever call gets here first.
+    -- Cascades to their cells.
+    delete from public.gold_trend_buckets b
+    where b.grain = p_grain
+      and (v_from is null
+           or b.bucket_start < date_trunc(p_grain, v_from::timestamp)::date
+           or b.bucket_start > v_to);
 
-    -- Every calendar bucket the window touches, so a bucket with no counted
-    -- match is still a point on the axis rather than a silent gap.
+    -- The buckets this call owns: those starting in [p_from, p_to].
+    delete from public.gold_trend_buckets b
+    where b.grain = p_grain
+      and (p_from is null or b.bucket_start >= p_from)
+      and (p_to is null or b.bucket_start <= p_to);
+
+    -- Every calendar bucket in range, so a bucket with no counted match is
+    -- still a point on the axis rather than a silent gap.
     insert into public.gold_trend_buckets
         (grain, bucket_start, date_from, date_to, complete, refreshed_at)
     select p_grain,
@@ -204,7 +235,20 @@ begin
         date_trunc(p_grain, v_from::timestamp),
         date_trunc(p_grain, v_to::timestamp),
         v_step
-    ) g(opens);
+    ) g(opens)
+    where (p_from is null or g.opens::date >= p_from)
+      and (p_to is null or g.opens::date <= p_to);
+
+    -- The tournament dates those buckets span. Contiguous, so every counted
+    -- match lands in one of them.
+    select min(b.date_from), max(b.date_to) into v_lo, v_hi
+    from public.gold_trend_buckets b
+    where b.grain = p_grain
+      and (p_from is null or b.bucket_start >= p_from)
+      and (p_to is null or b.bucket_start <= p_to);
+    if v_lo is null then
+        return 0;
+    end if;
 
     insert into public.gold_matchup_trends
         (grain, bucket_start, deck_a, deck_b, matches, wins, losses, ties,
@@ -215,7 +259,7 @@ begin
                s.loser_deck_id,
                s.is_tie
         from public.silver_pairings s
-        join public.gold_tournaments(v_from, v_to, v_min) t on t.id = s.tournament_id
+        join public.gold_tournaments(v_lo, v_hi, v_min) t on t.id = s.tournament_id
         join public.gold_trend_decks w on w.deck_id = s.winner_deck_id
         join public.gold_trend_decks l on l.deck_id = s.loser_deck_id
         where s.winner_deck_id <> s.loser_deck_id
@@ -280,7 +324,9 @@ begin
             select count(*)
             from public.gold_tournaments(b.date_from, b.date_to, v_min) t
         )
-    where b.grain = p_grain;
+    where b.grain = p_grain
+      and (p_from is null or b.bucket_start >= p_from)
+      and (p_to is null or b.bucket_start <= p_to);
 
     return n;
 end;
@@ -316,9 +362,9 @@ end;
 $fn$;
 
 revoke all on function public.refresh_gold_trend_decks(integer)     from public, anon, authenticated;
-revoke all on function public.refresh_gold_matchup_trends(text)     from public, anon, authenticated;
+revoke all on function public.refresh_gold_matchup_trends(text, date, date) from public, anon, authenticated;
 revoke all on function public.refresh_gold(date)                    from public, anon, authenticated;
 
 grant execute on function public.refresh_gold_trend_decks(integer)  to service_role;
-grant execute on function public.refresh_gold_matchup_trends(text)  to service_role;
+grant execute on function public.refresh_gold_matchup_trends(text, date, date) to service_role;
 grant execute on function public.refresh_gold(date)                 to service_role;

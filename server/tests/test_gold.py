@@ -32,11 +32,14 @@ class FakeClient:
     """Serves the period listing and records every refresh call.
 
     `fail_on` names steps whose calls should raise, to stand in for a call that
-    hits a statement timeout.
+    hits a statement timeout. `window` is the 'all' period's (date_from,
+    date_to), which the trend step reads to split its calls; None stands in for
+    a window the periods step has not resolved yet.
     """
 
-    def __init__(self, periods=("30d", "all"), fail_on=(), rows_per_call=7):
+    def __init__(self, periods=("30d", "all"), fail_on=(), rows_per_call=7, window=None):
         self.periods = list(periods)
+        self.window = window
         self.fail_on = set(fail_on)
         self.rows_per_call = rows_per_call
         self.calls: list[tuple[str, dict]] = []
@@ -54,6 +57,9 @@ class FakeClient:
         if url.endswith("/gold_periods") and params.get("select") == "period":
             self.listings.append(params)
             return FakeResponse(200, json_data=[{"period": p} for p in self.periods])
+        if url.endswith("/gold_periods") and params.get("period") == "eq.all":
+            rows = [] if self.window is None else [dict(zip(("date_from", "date_to"), self.window))]
+            return FakeResponse(200, json_data=rows)
 
         # Anything else is a count_rows probe.
         return FakeResponse(200, headers={"content-range": "0-0/0"})
@@ -213,15 +219,38 @@ def test_dry_run_writes_nothing(_client):
     assert client.calls == []
 
 
-def test_trends_run_once_per_grain(_client):
+def test_trends_run_once_per_grain_without_a_window(_client):
+    """Before the window resolves there is nothing to split: one open range."""
     client = _client(FakeClient(periods=["30d", "all"]))
 
     gold.run(_args())
 
     assert [payload for step, payload in client.calls if step == "matchup_trends"] == [
-        {"p_grain": "week"},
-        {"p_grain": "month"},
+        {"p_grain": "week", "p_from": None, "p_to": None},
+        {"p_grain": "month", "p_from": None, "p_to": None},
     ]
+
+
+def test_trends_run_a_month_of_buckets_per_call(_client):
+    """A whole weekly grain is too many rows for one statement, so each call
+    covers one calendar month of bucket starts, open at both ends so a bucket
+    straddling the window's edge still belongs to exactly one call."""
+    client = _client(FakeClient(window=("2026-04-13", "2026-06-02")))
+
+    gold.run(_args(only=["matchup_trends"]))
+
+    ranges = [(None, "2026-04-30"), ("2026-05-01", "2026-05-31"), ("2026-06-01", None)]
+    assert [payload for _, payload in client.calls] == [
+        {"p_grain": grain, "p_from": lo, "p_to": hi} for grain in gold.GRAINS for lo, hi in ranges
+    ]
+
+
+def test_trend_ranges_cross_the_year():
+    client = FakeClient(window=("2026-12-20", "2027-01-05"))
+
+    ranges = gold.trend_ranges(client, "http://db", {})
+
+    assert ranges == [("2026-12", None, "2026-12-31"), ("2027-01", "2027-01-01", None)]
 
 
 def test_trend_axis_is_the_top_trend_decks(_client):
@@ -238,4 +267,6 @@ def test_period_does_not_narrow_the_trends(_client):
 
     gold.run(_args(period=["30d"], only=["matchup_trends"]))
 
-    assert [payload for _, payload in client.calls] == [{"p_grain": g} for g in gold.GRAINS]
+    assert [payload for _, payload in client.calls] == [
+        {"p_grain": g, "p_from": None, "p_to": None} for g in gold.GRAINS
+    ]

@@ -168,7 +168,9 @@ Things about both refreshes that are easy to get wrong:
   *silently*, not as a foreign-key error. In gold, `periods` resolves the
   dates every later step reads, `deck_stats` rolls up `matchup_stats`, and the
   trend steps read the `all` period's `deck_stats` for their axis, so they run
-  last (`trend_decks` once, then `matchup_trends` once per grain).
+  last (`trend_decks` once, then `matchup_trends` once per grain and calendar
+  month of bucket starts - a whole weekly grain is ~75k rows, too many to
+  write inside the timeout in one call; `gold.trend_ranges`).
   `silver.STEPS` and `gold.STEPS` encode the orders — silver has no standings
   step, since the view cannot fall behind.
 - **They re-read their whole source every run**, not just what is new. A
