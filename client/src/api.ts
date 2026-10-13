@@ -78,6 +78,36 @@ export type DeckMatchup = Rated & {
   deck_name: string | null;
 };
 
+/** The calendar buckets the matchup trends are computed in (sql/016). */
+export type Grain = "week" | "month";
+
+/** One deck on the trend axis - the retention window's most played decks. */
+export type TrendDeck = {
+  deck_id: string;
+  deck_name: string | null;
+  /** 1 is the most played deck of the whole window. */
+  rank: number;
+  entries: number;
+};
+
+/** One calendar week or month, and the dates of it the data covers. */
+export type TrendBucket = {
+  bucket_start: string;
+  date_from: string;
+  date_to: string;
+  /** False when the retention cutoff or the last event clips the bucket. */
+  complete: boolean;
+  tournaments: number;
+  /** Matches between two trend decks, not every match in the bucket. */
+  matches: number;
+};
+
+/** The deck asked for against one opponent in one bucket, from its side. */
+export type TrendCell = Rated & {
+  bucket_start: string;
+  deck_b: string;
+};
+
 type Param = string | number | boolean | undefined | string[];
 
 async function get<T>(path: string, params: Record<string, Param> = {}): Promise<T> {
@@ -109,6 +139,15 @@ export const fetchMatrix = (period: Period) => get<MatchupCell[]>("/matchups", {
 
 export const fetchDeckMatchups = (deckId: string, period: Period) =>
   get<DeckMatchup[]>(`/decks/${encodeURIComponent(deckId)}/matchups`, { period });
+
+// The trends span the whole retention window, so they take a grain, not a period.
+
+export const fetchTrendDecks = () => get<TrendDeck[]>("/trends/decks");
+
+export const fetchTrendBuckets = (grain: Grain) => get<TrendBucket[]>("/trends/buckets", { grain });
+
+export const fetchDeckTrends = (deckId: string, grain: Grain) =>
+  get<TrendCell[]>(`/decks/${encodeURIComponent(deckId)}/trends`, { grain });
 
 /** Composited deck image, written by server/scripts/download_deck_sprites.py. */
 export const deckImage = (deckId: string) => `/decks/${encodeURIComponent(deckId)}.png`;

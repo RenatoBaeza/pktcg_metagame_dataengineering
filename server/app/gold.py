@@ -1,7 +1,8 @@
 """Driver for the silver -> gold refresh.
 
 The same arrangement as app/silver.py: the transform is Postgres functions
-(sql/012_gold_finished.sql) and this module only calls them, one RPC at a time,
+(sql/012_gold_finished.sql, sql/016_matchup_trends.sql) and this module only
+calls them, one RPC at a time,
 so no single statement gambles against the 8s PostgREST timeout.
 
 Gold is finished tables - every number the frontend draws, computed here once
@@ -15,6 +16,10 @@ period, not the tournament:
     matchup_stats   one call per period.
     deck_stats      one call per period. Rolls up that period's matchup cells
                     into each deck's record, so it runs after them.
+    trend_decks     the trend axis: the 'all' period's TREND_DECKS most played
+                    decks. Reads deck_stats, so it runs after them.
+    matchup_trends  one call per grain (week, month): every matchup between
+                    two trend decks, per calendar bucket.
 """
 
 import argparse
@@ -32,7 +37,14 @@ SETUP_STEPS = ("periods", "decks")
 # Run once per period, in this order.
 PERIOD_STEPS = ("matchup_stats", "deck_stats")
 
-STEPS = SETUP_STEPS + PERIOD_STEPS
+# Run after every period step: trend_decks once, matchup_trends once per grain.
+TREND_STEPS = ("trend_decks", "matchup_trends")
+
+STEPS = SETUP_STEPS + PERIOD_STEPS + TREND_STEPS
+
+# The calendar buckets the trends are computed in. Fixed in the SQL as well
+# (gold_trend_buckets.grain), so adding one means both.
+GRAINS = ("week", "month")
 
 PERIODS_TABLE = "gold_periods"
 
@@ -42,13 +54,18 @@ PERIODS_TABLE = "gold_periods"
 # full against almost no matches. See sql/015_min_tournament_matches.sql.
 MIN_TOURNAMENT_MATCHES = 10
 
+# How many decks the trends follow: the most played of the 'all' period. Every
+# matchup between two of them is tracked bucket by bucket, so the row count
+# grows with its square. See sql/016_matchup_trends.sql.
+TREND_DECKS = 100
+
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--only",
         choices=STEPS,
         action="append",
-        help="Refresh just this step. Repeatable. Defaults to all four, in order.",
+        help="Refresh just this step. Repeatable. Defaults to all of them, in order.",
     )
     parser.add_argument(
         "--period",
@@ -128,6 +145,10 @@ def run(args: argparse.Namespace) -> int:
                 })]
             elif step == "decks":
                 calls = [(step, {})]
+            elif step == "trend_decks":
+                calls = [(step, {"p_top": TREND_DECKS})]
+            elif step == "matchup_trends":
+                calls = [(f"{step}[{grain}]", {"p_grain": grain}) for grain in GRAINS]
             else:
                 calls = [(f"{step}[{period}]", {"p_period": period}) for period in scope]
 

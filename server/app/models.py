@@ -24,6 +24,10 @@ from pydantic import BaseModel
 # a row there, a member here, and a preset in client/src/filters.ts.
 Period = Literal["3d", "7d", "30d", "60d", "90d", "all"]
 
+# The calendar buckets the matchup trends are computed in (sql/016). Adding one
+# means the check on gold_trend_buckets.grain, gold.GRAINS and a member here.
+Grain = Literal["week", "month"]
+
 
 class Coverage(BaseModel):
     """What the gold layer currently spans."""
@@ -99,6 +103,44 @@ class DeckMatchup(BaseModel):
 
     deck_b: str
     deck_name: str | None = None
+    matches: int
+    wins: int
+    losses: int
+    ties: int
+    win_rate: float | None = None
+    score_rate: float | None = None
+    score_low: float | None = None
+    score_high: float | None = None
+
+
+class TrendDeck(BaseModel):
+    """One deck on the trend axis: the 'all' period's most played decks."""
+
+    deck_id: str
+    deck_name: str | None = None
+    # Its rank in the 'all' period, 1 being the most played.
+    rank: int
+    entries: int
+
+
+class TrendBucket(BaseModel):
+    """One calendar week or month, and the dates of it the data covers."""
+
+    bucket_start: date
+    date_from: date
+    date_to: date
+    # False when the retention cutoff or the last event clips the bucket.
+    complete: bool
+    tournaments: int = 0
+    # Matches between two trend decks, not every match in the bucket.
+    matches: int = 0
+
+
+class TrendCell(BaseModel):
+    """deck_a against one opponent in one bucket, from deck_a's side."""
+
+    bucket_start: date
+    deck_b: str
     matches: int
     wins: int
     losses: int

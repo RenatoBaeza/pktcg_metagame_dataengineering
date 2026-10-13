@@ -257,3 +257,84 @@ def test_different_periods_are_memoed_apart(reads):
     client.get("/decks?period=90d")
 
     assert len(calls) == 2
+
+
+def test_trend_decks_are_the_frozen_axis(reads):
+    calls, replies = reads
+    replies["gold_trend_decks"] = [
+        {"deck_id": "dragapult-ex", "deck_name": "Dragapult ex", "rank": 1, "entries": 9000}
+    ]
+
+    body = client.get("/trends/decks").json()
+
+    assert calls[0][0] == "gold_trend_decks"
+    assert calls[0][1]["order"] == "rank"
+    assert body[0]["deck_id"] == "dragapult-ex"
+
+
+def test_trend_buckets_read_one_grain(reads):
+    calls, replies = reads
+    replies["gold_trend_buckets"] = [
+        {
+            "bucket_start": "2026-04-13",
+            "date_from": "2026-04-13",
+            "date_to": "2026-04-19",
+            "complete": True,
+            "tournaments": 70,
+            "matches": 9000,
+        }
+    ]
+
+    body = client.get("/trends/buckets?grain=month").json()
+
+    assert calls[0][1]["grain"] == "eq.month"
+    assert calls[0][1]["order"] == "bucket_start"
+    assert body[0]["complete"] is True
+
+
+def test_deck_trends_scope_to_the_deck_and_grain(reads):
+    calls, _ = reads
+
+    client.get("/decks/n-zoroark/trends?grain=week")
+
+    table, params = calls[0]
+    assert table == "gold_matchup_trends"
+    assert params["grain"] == "eq.week"
+    assert params["deck_a"] == "eq.n-zoroark"
+    assert params["order"] == "deck_b,bucket_start"
+
+
+def test_an_absent_grain_means_week(reads):
+    calls, _ = reads
+
+    client.get("/trends/buckets")
+
+    assert calls[0][1]["grain"] == "eq.week"
+
+
+def test_an_unknown_grain_is_rejected(reads):
+    assert client.get("/trends/buckets?grain=day").status_code == 422
+    assert client.get("/decks/a/trends?grain=year").status_code == 422
+
+
+def test_trend_cells_survive_the_response_model(reads):
+    _, replies = reads
+    replies["gold_matchup_trends"] = [
+        {
+            "bucket_start": "2026-09-07",
+            "deck_b": "gardevoir-ex",
+            "matches": 12,
+            "wins": 7,
+            "losses": 4,
+            "ties": 1,
+            "win_rate": 0.6364,
+            "score_rate": 0.625,
+            "score_low": 0.3543,
+            "score_high": 0.8401,
+        }
+    ]
+
+    cell = client.get("/decks/a/trends").json()[0]
+
+    assert cell["bucket_start"] == "2026-09-07"
+    assert cell["score_low"] < cell["score_rate"] < cell["score_high"]

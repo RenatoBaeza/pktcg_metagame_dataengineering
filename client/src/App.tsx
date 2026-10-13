@@ -12,11 +12,15 @@ import type { Period } from "./api";
 import { DEFAULT_PERIOD } from "./filters";
 import { Backdrop } from "./fx/Backdrop";
 import { useI18n } from "./i18n";
+import { ViewTabs } from "./components/ViewTabs";
+import { Trends } from "./trends/Trends";
 import { useTheme } from "./useTheme";
+import { useView } from "./useView";
 
 export default function App() {
   const { t } = useI18n();
   const [mode, setMode] = useTheme();
+  const [view, setView] = useView();
   const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -25,16 +29,19 @@ export default function App() {
   // Every panel below scopes to this one period, so their numbers always agree.
   // The server resolves its dates, so nothing here waits on coverage first.
   // It is the only choice: both reads are the period's top 50 decks.
+  // Only the metagame view reads these; the trends view has its own reads.
   const decks = useQuery({
     queryKey: ["decks", period],
     queryFn: () => fetchDecks(period),
     placeholderData: (previous) => previous,
+    enabled: view === "metagame",
   });
 
   const matrix = useQuery({
     queryKey: ["matrix", period],
     queryFn: () => fetchMatrix(period),
     placeholderData: (previous) => previous,
+    enabled: view === "metagame",
   });
 
   const selectedDeck = decks.data?.find((deck) => deck.deck_id === selected) ?? null;
@@ -55,7 +62,11 @@ export default function App() {
       <div className="app">
         <Header coverage={coverage.data} mode={mode} onMode={setMode} />
 
-        {(
+        <ViewTabs view={view} onView={setView} />
+
+        {view === "trends" ? (
+          <Trends mode={mode} />
+        ) : (
           <>
             <FilterBar period={period} onChange={setPeriod} busy={decks.isFetching || matrix.isFetching} />
 
@@ -122,7 +133,7 @@ export default function App() {
         </footer>
       </div>
 
-      {selectedDeck && (
+      {view === "metagame" && selectedDeck && (
         <DeckDetail
           deck={selectedDeck}
           period={period}

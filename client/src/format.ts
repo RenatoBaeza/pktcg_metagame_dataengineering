@@ -20,6 +20,17 @@ export function createFormat(locale: string) {
     return formatter.format(sign ? value : value * 100);
   };
   const count = (value: number) => numbers.format(value);
+  const days = new Map<string, Intl.DateTimeFormat>();
+  // A calendar day ("2026-10-04"), formatted on that day whatever the zone.
+  const day = (iso: string, options: Intl.DateTimeFormatOptions) => {
+    const key = JSON.stringify(options);
+    let formatter = days.get(key);
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" });
+      days.set(key, formatter);
+    }
+    return formatter.format(new Date(`${iso}T00:00:00Z`));
+  };
   return {
     count,
     percent: (value: number | null | undefined, digits = 0) => rate(value, digits, false),
@@ -30,6 +41,15 @@ export function createFormat(locale: string) {
       const value = new Date(iso);
       return Number.isNaN(value.getTime()) ? "—" : dates.format(value);
     },
+    /** "Sep 5 – Oct 4, 2026": the year is stated once, and only when it differs. */
+    dateRange: (from: string, to: string) => {
+      const sameYear = from.slice(0, 4) === to.slice(0, 4);
+      const start = day(from, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
+      return `${start} – ${day(to, { day: "numeric", month: "short", year: "numeric" })}`;
+    },
+    /** A trend column's heading: "Sep 8" for a week, "Sep" for a month. */
+    bucketLabel: (iso: string, grain: "week" | "month") =>
+      day(iso, grain === "week" ? { day: "numeric", month: "short" } : { month: "short" }),
     relativeTime: (iso: string | null) => {
       if (!iso) return null;
       const timestamp = new Date(iso).getTime();

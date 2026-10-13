@@ -1,0 +1,366 @@
+/* ── view tabs ──────────────────────────────────────────────────────────── */
+
+/* Game-menu tabs: ink-framed cards, the current one yellow. Hover changes the
+   colour and nothing else. */
+.view-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: -6px;
+  animation: rise 600ms var(--ease-out) 450ms backwards;
+}
+
+.view-tabs a {
+  padding: 8px 18px;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  background: var(--surface-1);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.view-tabs a:hover {
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+
+.view-tabs a[aria-current="page"] {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+/* ── trend filter row ───────────────────────────────────────────────────── */
+
+.field-deck select {
+  width: min(320px, 100%);
+}
+
+.field-deck .select {
+  max-width: 100%;
+}
+
+.field-opponent {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-opponent select {
+  max-width: min(260px, 60vw);
+}
+
+@media (max-width: 480px) {
+  .field-deck,
+  .field-deck select {
+    width: 100%;
+  }
+}
+
+/* A row clicked far down the grid scrolls the chart back into view; this
+   keeps it clear of the sticky filter row. */
+.trend-anchor {
+  scroll-margin-top: 120px;
+}
+
+/* ── the pair heading ───────────────────────────────────────────────────── */
+
+.trend-pair {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.trend-pair img {
+  height: 30px;
+  max-width: 54px;
+  object-fit: contain;
+}
+
+.trend-pair-name {
+  font-weight: 650;
+  font-size: 15px;
+}
+
+.trend-pair-total {
+  margin-left: auto;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── chart ──────────────────────────────────────────────────────────────── */
+
+.trend-chart {
+  width: 100%;
+  min-height: 312px;
+}
+
+.trend-chart svg {
+  display: block;
+  overflow: visible;
+  border-radius: 10px;
+}
+
+.trend-chart svg:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 4px;
+}
+
+/* The matrix's blue and red, as a faint wash either side of even. */
+.trend-chart .zone {
+  opacity: 0.07;
+}
+
+.trend-chart .zone-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  fill: var(--text-muted);
+}
+
+.trend-chart .grid-rule {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+
+.trend-chart .even-rule {
+  stroke: var(--axis);
+  stroke-width: 1;
+}
+
+.trend-chart .tick {
+  font-size: 11px;
+  fill: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-chart .tick.partial {
+  opacity: 0.6;
+}
+
+.trend-chart .crosshair {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.trend-chart .trend-line {
+  fill: none;
+  stroke: var(--text-primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Filled when the interval clears 50%, hollow when it does not. The 2px ring
+   in the board colour keeps a point legible where it sits on the line. */
+.trend-chart .trend-point {
+  fill: var(--text-primary);
+  stroke: var(--surface-1);
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.trend-chart .trend-point.hollow {
+  fill: var(--surface-1);
+  stroke: var(--text-primary);
+  stroke-width: 1.75;
+}
+
+.trend-chart .trend-point.is-active {
+  fill: var(--accent);
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.trend-chart .end-label {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-chart .strip-bar {
+  fill: var(--axis);
+}
+
+.trend-chart .strip-bar.is-active {
+  fill: var(--text-muted);
+}
+
+/* ── grid ───────────────────────────────────────────────────────────────── */
+
+/* The matrix's opaque board: the headers are sticky, and cells scrolling under
+   a translucent one would bleed through. */
+.trend-scroll {
+  position: relative;
+  overflow: auto;
+  max-height: 78vh;
+  background: var(--surface-solid);
+  border: 2px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 0 8px 8px 0;
+}
+
+.trend-grid {
+  width: max-content;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.trend-grid th,
+.trend-grid td {
+  padding: 0;
+  margin: 0;
+}
+
+.trend-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-solid);
+  border-bottom: 1px solid var(--grid);
+}
+
+.trend-grid tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface-solid);
+  border-right: 1px solid var(--grid);
+}
+
+.trend-grid thead th:first-child {
+  z-index: 3;
+  left: 0;
+}
+
+.trend-grid .corner {
+  min-width: 200px;
+  height: 40px;
+}
+
+/* Inter, not the pixel face: every heading has a digit in it. */
+.bucket-head {
+  min-width: 46px;
+  padding: 10px 2px 8px !important;
+  vertical-align: bottom;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bucket-head.partial {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* The whole-window column stands a little apart from the buckets. */
+.bucket-head.whole {
+  padding-left: 10px !important;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.trend-grid .cell {
+  width: 46px;
+  min-width: 46px;
+  height: 40px;
+}
+
+.trend-grid .cell.whole {
+  width: 58px;
+  min-width: 58px;
+  padding-left: 10px !important;
+}
+
+.trend-grid .cell button {
+  font-size: 12px;
+}
+
+.trend-grid .cell.whole > div {
+  width: 100%;
+  height: 100%;
+}
+
+.trend-grid .row-head {
+  height: 40px;
+}
+
+.trend-grid .row-head .name {
+  max-width: 150px;
+}
+
+/* The row being charted: a yellow key on its heading, like the sorted column
+   in the matrix. A mark, not a movement. */
+.trend-grid tr.is-selected .row-head button {
+  background: var(--selected);
+}
+
+.trend-grid tr.is-selected .row-head .name {
+  font-weight: 700;
+}
+
+.trend-grid tr.is-selected .row-head::after {
+  content: "";
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  left: 0;
+  right: auto;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent-strong);
+  /* matrix.css ties this mark to the crosshair's --lit, which is 0 here. */
+  opacity: 1;
+}
+
+.show-more {
+  align-self: flex-start;
+  margin-top: 12px;
+  padding: 7px 14px;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.show-more:hover {
+  border-color: var(--line);
+}
+
+/* ── tooltip additions ──────────────────────────────────────────────────── */
+
+.tooltip .tip-when {
+  margin: -6px 0 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltip .tip-none {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin: 4px 0;
+}
+
+/* On a phone the opponent column would take most of the width the buckets
+   need, so the name gets less room. */
+@media (max-width: 480px) {
+  .trend-grid .corner {
+    min-width: 132px;
+  }
+  .trend-grid .row-head .name {
+    max-width: 76px;
+  }
+}

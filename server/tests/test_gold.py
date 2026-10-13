@@ -2,8 +2,8 @@
 
 The transform is SQL and is not exercised here. What is worth pinning down is
 the driver's contract with it: periods are resolved first and the dimension
-second, the stats run once per period with matchups before decks, and a call
-that blows up costs only itself.
+second, the stats run once per period with matchups before decks, the trends
+run last and once per grain, and a call that blows up costs only itself.
 """
 
 import argparse
@@ -97,8 +97,9 @@ def _args(**overrides):
 
 
 def test_steps_run_in_dependency_order(_client):
-    """Every step reads the dates refresh_gold_periods resolves, and deck_stats
-    rolls up matchup_stats - so the order is fixed."""
+    """Every step reads the dates refresh_gold_periods resolves, deck_stats
+    rolls up matchup_stats, and the trend axis is read off deck_stats - so the
+    order is fixed."""
     client = _client(FakeClient(periods=["30d", "all"]))
 
     assert gold.run(_args()) == 0
@@ -110,6 +111,9 @@ def test_steps_run_in_dependency_order(_client):
         "matchup_stats",
         "deck_stats",
         "deck_stats",
+        "trend_decks",
+        "matchup_trends",
+        "matchup_trends",
     ]
 
 
@@ -181,7 +185,7 @@ def test_one_failed_call_does_not_stop_the_run(_client):
     """A timed-out call is redone by the next run - it must not abort this one."""
     client = _client(FakeClient(periods=["30d", "90d", "all"], fail_on=["matchup_stats"]))
 
-    # 3 of 8 calls failing is over the tolerance, so the run reports failure...
+    # 3 of 11 calls failing is over the tolerance, so the run reports failure...
     assert gold.run(_args()) == 1
     # ...but the later steps still ran to completion.
     assert [step for step, _ in client.calls].count("deck_stats") == 3
@@ -207,3 +211,31 @@ def test_dry_run_writes_nothing(_client):
 
     assert gold.run(_args(dry_run=True)) == 0
     assert client.calls == []
+
+
+def test_trends_run_once_per_grain(_client):
+    client = _client(FakeClient(periods=["30d", "all"]))
+
+    gold.run(_args())
+
+    assert [payload for step, payload in client.calls if step == "matchup_trends"] == [
+        {"p_grain": "week"},
+        {"p_grain": "month"},
+    ]
+
+
+def test_trend_axis_is_the_top_trend_decks(_client):
+    client = _client(FakeClient())
+
+    gold.run(_args(only=["trend_decks"]))
+
+    assert client.calls == [("trend_decks", {"p_top": gold.TREND_DECKS})]
+
+
+def test_period_does_not_narrow_the_trends(_client):
+    """The trends span the whole window, so a --period has nothing to scope."""
+    client = _client(FakeClient(periods=["30d", "all"]))
+
+    gold.run(_args(period=["30d"], only=["matchup_trends"]))
+
+    assert [payload for _, payload in client.calls] == [{"p_grain": g} for g in gold.GRAINS]

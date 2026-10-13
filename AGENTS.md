@@ -166,9 +166,11 @@ Things about both refreshes that are easy to get wrong:
 - **Order matters.** In silver, `silver_pairings` inner-joins
   `silver_tournaments`, so a tournament missing from it yields no pairings rows
   *silently*, not as a foreign-key error. In gold, `periods` resolves the
-  dates every later step reads, and `deck_stats` rolls up `matchup_stats`, so
-  it runs last. `silver.STEPS` and `gold.STEPS` encode the orders — silver has
-  no standings step, since the view cannot fall behind.
+  dates every later step reads, `deck_stats` rolls up `matchup_stats`, and the
+  trend steps read the `all` period's `deck_stats` for their axis, so they run
+  last (`trend_decks` once, then `matchup_trends` once per grain).
+  `silver.STEPS` and `gold.STEPS` encode the orders — silver has no standings
+  step, since the view cannot fall behind.
 - **They re-read their whole source every run**, not just what is new. A
   pairing's deck columns come from a standings ingest that usually lands
   *after* the pairing did, so an incremental-by-timestamp refresh would leave
@@ -201,10 +203,15 @@ GET /periods                      every period and the dates it resolved to
 GET /decks                        gold_deck_stats, top 50 by rank
 GET /decks/{deck_id}/matchups     gold_matchup_stats, one deck_a slice
 GET /matchups                     gold_matchup_stats, top-50 deck_a x deck_b
+GET /trends/decks                 gold_trend_decks, the trend axis by rank
+GET /trends/buckets               gold_trend_buckets, one grain's buckets
+GET /decks/{deck_id}/trends       gold_matchup_trends, one deck_a slice
 ```
 
-All of them take the same `?period=` (`3d`, `7d`, `30d`, `60d`, `90d`, `all`;
-anything else is a 422), and **nothing else**. The view is otherwise fixed:
+All but the trend routes take the same `?period=` (`3d`, `7d`, `30d`, `60d`,
+`90d`, `all`; anything else is a 422), and **nothing else**. The trend routes
+span the whole window and take `?grain=` (`week`, the default, or `month`)
+instead. The view is otherwise fixed:
 the axis is always the top 50 decks (`metagame.TOP_DECKS`), every cell with at
 least one match is returned (a thin cell is told apart by its Wilson interval,
 not hidden by a cutoff), and `'other'` is not in gold at all. The retired
@@ -252,6 +259,26 @@ rows) that every request re-summed: at 1.55 matches per row it was bigger than
 the silver it came from. The price is that only these periods can be asked
 for; adding one is a row in `gold_periods`, a member of `models.Period` and a
 preset in `client/src/filters.ts`.
+
+The **matchup trends** (`sql/016_matchup_trends.sql`) are the one part of gold
+not cut by period. They span the whole retention window in calendar buckets -
+a **grain**, `week` (ISO, Monday first) or `month` - so a bucket means the same
+thing from one refresh to the next:
+
+```
+gold_trend_decks     the axis: the 'all' period's TREND_DECKS (100) most
+                     played decks, frozen at refresh time
+gold_trend_buckets   (grain, bucket_start): the dates the bucket covers once
+                     clamped to the window, `complete`, and its totals
+gold_matchup_trends  (grain, deck_a, deck_b, bucket_start): one cell, with
+                     the same columns and rules as gold_matchup_stats
+```
+
+~108k rows (75k weekly, 32k monthly), and thin by nature - the median weekly
+cell is two matches, which is what the muted fill is for. Only matches between
+two axis decks count, so a bucket's `matches` is not the bucket's every match.
+Adding a grain means the check on `gold_trend_buckets.grain`, `gold.GRAINS`
+and `models.Grain`.
 
 Six decisions everything downstream depends on:
 
@@ -458,22 +485,26 @@ Everything is designed to be re-run safely:
 ## The client
 
 Vite + React + TypeScript, three runtime dependencies (react, react-dom,
-`@tanstack/react-query`). No component library and no charting library: the one
-real chart is a matchup heatmap, which is a `<table>` of coloured cells, and a
-library would cost more than it saved.
+`@tanstack/react-query`). No component library and no charting library: the
+heatmaps are `<table>`s of coloured cells and the one line chart
+(`trends/TrendChart.tsx`) is hand-drawn SVG, and a library would cost more
+than it saved.
 
-- `src/api.ts` types the four endpoints. Base URL is `/api` in dev, which
+- `src/api.ts` types the endpoints. Base URL is `/api` in dev, which
   `vite.config.ts` proxies to the FastAPI service so the browser stays on one
   origin; set `VITE_API_URL` to point at a deployed API instead.
 - Two views, switched by `ViewTabs` and kept in the URL hash (`#/`,
-  `#/insights`; `src/useView.ts`), since the static build has no server-side
-  routing. **Metagame** is everything below. **Insights** (`src/insights/`)
-  draws the offline analysis from `public/analysis.json`, typed in
-  `src/analysis.ts` against `report.as_json` - change both together. It is a
-  snapshot, not live gold, so it has no period filter and says when it was
-  computed. Its archetype groups use their own two-hue palette
-  (`--cluster-1/2` in `styles/insights.css`, orange/aqua, validated all-pairs
-  in both modes) plus a shape per group, kept clear of the matrix's blue/red.
+  `#/trends`; `src/useView.ts`), since the static build has no server-side
+  routing. **Metagame** is everything below. **Trends** (`src/trends/`) is one
+  deck's matchups against the other trend decks over time: a filter row of its
+  own (deck and weekly/monthly - no period, it always spans the window), a
+  line chart of one matchup, and a grid of every opponent x bucket that is
+  also the chart's table view. The chart's line is ink, not a data hue: its
+  position against the 50% rule is the polarity, the washes either side are
+  the matrix's blue/red, and a point is hollow where the matrix would mute
+  the cell. The grid's cells are the matrix's cells (`scoreColor`, muted,
+  dot for "did not meet"). Its "All" column is the `all` period's
+  `gold_matchup_stats` cell, never a sum of the buckets.
 - `src/scale.ts` is the diverging colour scale, and it is the file to read
   before changing any colour. Blue is favourable, red unfavourable, neutral
   gray at 50%, saturating at 25%/75% because real matchups between decks anyone

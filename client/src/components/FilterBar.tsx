@@ -25,36 +25,10 @@ export function FilterBar({
   onChange: (period: Period) => void;
   busy: boolean;
 }) {
-  const { t, language } = useI18n();
-  // "Sep 5 – Oct 4, 2026": the year is stated once, and only when it differs.
-  const range = (from: string, to: string) => {
-    const f = new Date(`${from}T00:00:00Z`);
-    const e = new Date(`${to}T00:00:00Z`);
-    const fmt = (d: Date, year: boolean) =>
-      new Intl.DateTimeFormat(language, {
-        day: "numeric",
-        month: "short",
-        ...(year ? { year: "numeric" } : {}),
-        timeZone: "UTC",
-      }).format(d);
-    const sameYear = f.getUTCFullYear() === e.getUTCFullYear();
-    return `${fmt(f, !sameYear)} – ${fmt(e, true)}`;
-  };
+  const { t, dateRange } = useI18n();
   const periods = useQuery({ queryKey: ["periods"], queryFn: fetchPeriods });
   const info = periods.data?.find((row) => row.period === period);
-
-  const sentinel = useRef<HTMLDivElement>(null);
-  const [stuck, setStuck] = useState(false);
-
-  useEffect(() => {
-    const element = sentinel.current;
-    if (!element) return;
-    const observer = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting), {
-      rootMargin: "-1px 0px 0px 0px",
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  const [sentinel, stuck] = useStuck();
 
   return (
     <>
@@ -79,7 +53,7 @@ export function FilterBar({
           <span className="label">{t("selectedDates")}</span>
           <span className="range-value" aria-live="polite">
             {info?.date_from && info.date_to ? (
-              range(info.date_from, info.date_to)
+              dateRange(info.date_from, info.date_to)
             ) : (
               "—"
             )}
@@ -90,4 +64,25 @@ export function FilterBar({
       </div>
     </>
   );
+}
+
+/**
+ * Whether a sticky bar is actually stuck, reported by a sentinel element
+ * placed just above it. The bar picks up its lifted shadow from this.
+ */
+export function useStuck() {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    const element = sentinel.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting), {
+      rootMargin: "-1px 0px 0px 0px",
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return [sentinel, stuck] as const;
 }

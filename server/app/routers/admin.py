@@ -64,6 +64,7 @@ def _run_gold(args: argparse.Namespace) -> None:
             only=None,
             period=None,
             window_months=RETAIN_MONTHS,
+            min_matches=gold.MIN_TOURNAMENT_MATCHES,
             dry_run=False,
         )
     )
