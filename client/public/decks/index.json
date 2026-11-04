@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-14T13:43:37+00:00",
+  "generated_at": "2026-11-04T13:46:49+00:00",
   "sprite_source": "https://r2.limitlesstcg.net/pokemon/gen9",
   "decks": [
     {
@@ -48,7 +48,8 @@
       "id": "ancient-box",
       "name": "Ancient Box",
       "icons": [
-        "roaring-moon"
+        "roaring-moon",
+        "flutter-mane"
       ],
       "image": "/decks/ancient-box.png"
     },
@@ -328,6 +329,15 @@
         "doublade"
       ],
       "image": "/decks/doublade-por.png"
+    },
+    {
+      "id": "dragapult-alakazam",
+      "name": "Dragapult Alakazam",
+      "icons": [
+        "dragapult",
+        "alakazam"
+      ],
+      "image": "/decks/dragapult-alakazam.png"
     },
     {
       "id": "dragapult-blaziken",
@@ -735,6 +745,14 @@
       "image": "/decks/hydreigon-ex.png"
     },
     {
+      "id": "igglybuff-30c",
+      "name": "Igglybuff",
+      "icons": [
+        "igglybuff"
+      ],
+      "image": "/decks/igglybuff-30c.png"
+    },
+    {
       "id": "incineroar-ex",
       "name": "Incineroar",
       "icons": [
@@ -925,6 +943,15 @@
       "image": "/decks/mega-absol-box.png"
     },
     {
+      "id": "mega-absol-mega-audino",
+      "name": "Absol Audino",
+      "icons": [
+        "absol-mega",
+        "audino-mega"
+      ],
+      "image": "/decks/mega-absol-mega-audino.png"
+    },
+    {
       "id": "mega-camerupt-ex",
       "name": "Mega Camerupt",
       "icons": [
@@ -1110,6 +1137,15 @@
       "image": "/decks/metagross-cri.png"
     },
     {
+      "id": "mew-ex-30c",
+      "name": "Mew Box",
+      "icons": [
+        "mew",
+        "clefairy"
+      ],
+      "image": "/decks/mew-ex-30c.png"
+    },
+    {
       "id": "milotic-ex",
       "name": "Milotic",
       "icons": [
@@ -1287,6 +1323,14 @@
         "bellibolt"
       ],
       "image": "/decks/reging-bolt-bellibolt.png"
+    },
+    {
+      "id": "relicanth-pbl",
+      "name": "Relicanth",
+      "icons": [
+        "relicanth"
+      ],
+      "image": "/decks/relicanth-pbl.png"
     },
     {
       "id": "roaring-moon-ex",

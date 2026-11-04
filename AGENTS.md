@@ -154,12 +154,16 @@ Each transform is **SQL, not Python**: `refresh_silver_*` in `sql/005_silver.sql
 and `refresh_gold_*` in `sql/012_gold_finished.sql`. `app/silver.py` and
 `app/gold.py` only drive them over PostgREST RPC — silver a batch of tournaments
 at a time, gold one period at a time. That split is deliberate —
-`silver_pairings` alone is ~290k bronze rows joined twice against standings,
+`silver_pairings` alone is ~470k bronze rows joined twice against standings,
 and pulling that through PostgREST to reshape it in Python would spend minutes
 of transfer on work Postgres does in place in seconds.
 Batching keeps any one statement inside the 8s PostgREST statement timeout; if
-a silver call ever times out, lower `--chunk-size` rather than reaching for a
-different design. Gold's slowest call is ~2.3s (the `all` period's matchups).
+a silver call ever times out, lower `--chunk-size` (default 50) rather than
+reaching for a different design. Gold's slowest call is ~2.3s (the `all`
+period's matchups). `refresh_silver_pairings` finds orphans and changed rows
+as sets (`EXCEPT` over each side's `tournament_id` index), never by probing a
+sha1 primary key row by row - that probe is what pushed every batch past the
+timeout in Nov 2026 (`sql/017`).
 
 Things about both refreshes that are easy to get wrong:
 
@@ -180,7 +184,8 @@ Things about both refreshes that are easy to get wrong:
 - **Each function is a full reconcile of its slice** (a batch of tournaments
   in silver, a period in gold), deleting rows that no longer qualify before
   writing the rest, inside one call. Re-running is a no-op beyond
-  `refreshed_at`.
+  `refreshed_at` - and in `silver_pairings` not even that: it writes only
+  rows that differ, so its `refreshed_at` is when a row last changed.
 
 ### The ingest pipeline
 
@@ -580,5 +585,14 @@ than it saved.
 - `.github/workflows/ingest-tournaments.yml` runs all three ingests every 6
   hours, then the silver refresh, then the gold refresh, and is manually
   dispatchable with `dry_run` / `max_requests` inputs. Its steps all run with
-  `working-directory: server`. The silver and gold steps are skipped on a dry
+  `working-directory: server` and `shell: bash` - the explicit shell is what
+  turns on `pipefail`, so a script's exit 1 survives its `| tee` and the job
+  goes red. Every step after the first carries `!cancelled()`, so one failing
+  step does not stop the rest. The silver and gold steps are skipped on a dry
   run, since there would be nothing new to derive from.
+  A second job, `deck-sprites`, then runs `download_deck_sprites.py` and
+  commits any new deck images under `client/public/decks/` straight to master
+  (it is the only job with `contents: write`). A run with no new deck commits
+  nothing: composites are byte-identical on rebuild, and `index.json` is only
+  rewritten when a deck changes - it also keeps entries for decks that have
+  aged out of `silver_standings`, since their PNGs are still on disk.

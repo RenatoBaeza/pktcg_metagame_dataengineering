@@ -87,6 +87,19 @@ def test_bye_has_no_player2():
     assert row["winner"] == "dublin0814"
 
 
+def test_bye_recorded_as_player2_only_is_restated_as_player1():
+    """Some events record a bye on the player2 side, with no player1 at all."""
+    flipped = {"round": 1, "phase": 1, "table": 2, "winner": "alsblar",
+               "games": {}, "player2": "alsblar"}
+    usual = {"round": 1, "phase": 1, "table": 2, "winner": "alsblar",
+             "player1": "alsblar"}
+    row = to_pairing_row(TID, flipped)
+    assert row["player1"] == "alsblar"
+    assert row["player2"] is None
+    assert row["winner"] == "alsblar"
+    assert row["id"] == to_pairing_row(TID, usual)["id"]
+
+
 def test_integer_winner_becomes_result_code():
     """The API returns -1 (unpaired / no result) and 0 in the `winner` field."""
     unpaired = to_pairing_row(

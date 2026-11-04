@@ -114,3 +114,23 @@ def test_composite_of_one_sprite_has_no_trailing_gap(tmp_path):
     sprites.composite([_sprite(tmp_path / "solo.png", (28, 36))], out)
 
     assert Image.open(out).size == (28, 36)
+
+
+def test_merge_manifest_keeps_aged_out_decks_and_replaces_seen_ones():
+    previous = [
+        {"id": "old-deck", "icons": ["a"]},
+        {"id": "kept-deck", "icons": ["b"]},
+    ]
+    current = [
+        {"id": "kept-deck", "icons": ["b", "c"]},
+        {"id": "new-deck", "icons": ["d"]},
+    ]
+    assert sprites.merge_manifest(previous, current) == [
+        {"id": "kept-deck", "icons": ["b", "c"]},
+        {"id": "new-deck", "icons": ["d"]},
+        {"id": "old-deck", "icons": ["a"]},
+    ]
+
+
+def test_read_manifest_of_a_missing_index_is_empty(tmp_path):
+    assert sprites.read_manifest(tmp_path / "index.json") == []

@@ -1,7 +1,7 @@
 """Rebuild the silver layer from bronze.
 
 Cheap and safe to run as often as you like: the refresh is a full reconcile,
-not an append, so re-running only bumps refreshed_at. It reads all of bronze
+not an append, and it writes only rows that changed. It reads all of bronze
 every time rather than just what is new, because a pairing's deck columns are
 filled in by a standings ingest that lands later than the pairing itself.
 

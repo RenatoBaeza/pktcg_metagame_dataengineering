@@ -161,6 +161,29 @@ def composite(sources: list[Path], destination: Path) -> None:
     canvas.save(destination)
 
 
+def read_manifest(path: Path) -> list[dict[str, Any]]:
+    """The decks an existing index.json lists, or [] if there is none yet."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))["decks"]
+    except (FileNotFoundError, KeyError, ValueError):
+        return []
+
+
+def merge_manifest(
+    previous: list[dict[str, Any]], current: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """This run's decks, plus any earlier entry this run did not see.
+
+    silver_standings only spans the retention window, so a deck that has aged
+    out of it is no longer read - but its PNG is still in the directory (and
+    still committed), so index.json keeps listing it rather than describing
+    fewer files than are there. A deck seen this run replaces its old entry.
+    """
+    by_id = {deck["id"]: deck for deck in previous}
+    by_id.update({deck["id"]: deck for deck in current})
+    return [by_id[deck_id] for deck_id in sorted(by_id)]
+
+
 def run(args: argparse.Namespace) -> int:
     try:
         base, secret_key = supabase.credentials()
@@ -218,19 +241,24 @@ def run(args: argparse.Namespace) -> int:
             }
         )
 
-    (out / "index.json").write_text(
-        json.dumps(
-            {
-                "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "sprite_source": SPRITE_BASE,
-                "decks": manifest,
-            },
-            indent=2,
+    index_path = out / "index.json"
+    merged = merge_manifest(read_manifest(index_path), manifest)
+    if merged == read_manifest(index_path):
+        print(f"wrote {len(manifest)} deck images to {out}, index.json unchanged")
+    else:
+        index_path.write_text(
+            json.dumps(
+                {
+                    "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "sprite_source": SPRITE_BASE,
+                    "decks": merged,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
-    print(f"wrote {len(manifest)} deck images and index.json to {out}")
+        print(f"wrote {len(manifest)} deck images and index.json ({len(merged)} decks) to {out}")
 
     if skipped:
         print(f"no image for: {', '.join(skipped)}", file=sys.stderr)

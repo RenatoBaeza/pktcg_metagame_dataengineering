@@ -174,7 +174,14 @@ def to_pairing_row(tournament_id: str, pairing: dict[str, Any]) -> dict[str, Any
     `winner` arrives either as a username or as a bare integer (-1 or 0) that
     encodes "no winner". Those are split into `winner` and `result_code` so
     neither meaning is lost.
+
+    A bye is normally player1 with no player2, but some events record it the
+    other way round - player2 only, and winning. That is restated as the
+    usual shape, since player1 is the one side every row must have.
     """
+    if "player1" not in pairing and pairing.get("player2"):
+        pairing = {**pairing, "player1": pairing["player2"], "player2": None}
+
     raw_winner = pairing.get("winner")
     winner = raw_winner if isinstance(raw_winner, str) else None
     result_code = raw_winner if isinstance(raw_winner, int) else None

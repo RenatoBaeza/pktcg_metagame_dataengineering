@@ -2,7 +2,7 @@
 
 The transform itself is two Postgres functions (sql/005_silver.sql); this
 module only calls them. Keeping the work server-side is the whole point:
-silver_pairings is derived from ~290k bronze rows joined twice against
+silver_pairings is derived from ~470k bronze rows joined twice against
 standings, and dragging that through PostgREST to reshape it in Python would
 spend minutes of transfer on what Postgres does in place in seconds.
 
@@ -32,7 +32,11 @@ from app.limitless import RETAIN_MONTHS, retention_cutoff
 # (sql/007_shrink.sql), so it needs no refreshing and cannot fall behind.
 STEPS = ("tournaments", "pairings")
 
-CHUNK_SIZE = 200
+# Was 200 until 2026-11. By then a 200-tournament call averaged 5.5s of the 8s
+# PostgREST statement timeout, and late-October growth pushed every batch past
+# it. sql/017 took most of the cost out of the call; the smaller batch is the
+# margin on top. Time per run is the same either way, only spread thinner.
+CHUNK_SIZE = 50
 
 # PostgREST caps a response at 1000 rows regardless of the limit asked for.
 PAGE_SIZE = 1000

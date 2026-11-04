@@ -29,8 +29,14 @@ jobs:
     # The API allows 50 requests / 5 min, shared across both per-tournament
     # endpoints. 300 each paces out to roughly 30 minutes per step.
     timeout-minutes: 120
+    # An explicit `shell: bash` is what turns on pipefail. Without it a step's
+    # status is tee's, always 0, and every silver batch timing out for a week
+    # (2026-11) still showed green. With it a script's exit 1 fails its step,
+    # so the later steps carry `!cancelled()` to keep running regardless - a
+    # bad ingest should not also stop the refreshes - while the job goes red.
     defaults:
       run:
+        shell: bash
         working-directory: server
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +63,7 @@ jobs:
       # than in parallel: each paces itself against a rate limit that is shared
       # across the whole API, so overlapping them would trip it.
       - name: Ingest pairings
+        if: ${{ !cancelled() }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -69,6 +76,7 @@ jobs:
             | tee pairings.log
 
       - name: Ingest standings
+        if: ${{ !cancelled() }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -86,7 +94,7 @@ jobs:
       # They enumerate only in-window tournaments (--window-months), so the
       # prune step below is not undone by the next reconcile.
       - name: Refresh silver layer
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !cancelled() && !inputs.dry_run }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -98,7 +106,7 @@ jobs:
 
       # Gold reads silver, so it can only run after the step above.
       - name: Refresh gold layer
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !cancelled() && !inputs.dry_run }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -112,7 +120,7 @@ jobs:
       # MIN_TOURNAMENT_DATE, but silver and gold are a rolling window, so the
       # derived rows outside it are dropped now and never re-added.
       - name: Prune derived layer to retention window
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !cancelled() && !inputs.dry_run }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -151,3 +159,70 @@ jobs:
             grep -E 'deleted|rows after|retention window' prune.log 2>/dev/null || echo '(step did not run)'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # New decks show up in silver as soon as their standings land, but their
+  # images are committed assets under client/public/decks/, so without this a
+  # new deck renders with no sprite until someone runs the script by hand.
+  # A job of its own, not a step above, so that it alone holds write access to
+  # the repo and checks out master as it is now rather than as it was when the
+  # hour-long ingest started. The sprites come from Limitless's asset CDN, not
+  # the rate-limited API, so this can follow the ingest without pacing.
+  deck-sprites:
+    needs: ingest
+    # Even when an ingest step failed: whatever standings did land may still
+    # have brought new decks with them.
+    if: ${{ !cancelled() && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --locked --no-dev
+
+      # The raw per-Pokemon downloads, so a run only fetches icons it has not
+      # seen. Caches are immutable per key, hence the run id in it and the
+      # prefix to restore the most recent one from.
+      - uses: actions/cache@v4
+        with:
+          path: server/.sprite-cache
+          key: sprite-cache-${{ github.run_id }}
+          restore-keys: sprite-cache-
+
+      # Exits 1 when a deck's sprite is on neither CDN host. Every other deck
+      # is still written, so that is a warning to look at, not a reason to
+      # withhold the images that did build.
+      - name: Build deck sprites
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PYTHONIOENCODING: utf-8
+          PYTHONUNBUFFERED: "1"
+        run: |
+          uv run python scripts/download_deck_sprites.py \
+            || echo "::warning::some decks have no sprite - see the log above"
+
+      # Composites are deterministic and index.json is only rewritten when a
+      # deck changes, so a run with nothing new leaves the tree clean and
+      # commits nothing.
+      - name: Commit new sprites
+        run: |
+          git add ../client/public/decks
+          if git diff --cached --quiet; then
+            echo "no new deck sprites"
+            exit 0
+          fi
+          git diff --cached --stat
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(decks): add sprites for new decks"
+          git pull --rebase
+          git push
