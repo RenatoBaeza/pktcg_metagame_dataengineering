@@ -77,7 +77,7 @@ def run(
     args: argparse.Namespace,
     resource: str,
     table: str,
-    row_mapper: Callable[[str, dict[str, Any]], dict[str, Any]],
+    row_mapper: Callable[[str, dict[str, Any]], dict[str, Any] | None],
     on_conflict: str,
     key: Callable[[dict[str, Any]], Any],
 ) -> int:
@@ -85,6 +85,8 @@ def run(
 
     `key` extracts a row's identity, used to collapse duplicates inside a single
     payload - PostgREST rejects a batch that touches the same key twice.
+    `row_mapper` may return None for an item that carries no row (an empty
+    table slot in pairings); those are dropped.
     """
     # Derived from the resource rather than the table: the progress columns name
     # what was fetched, and so kept their bare names when the tables gained the
@@ -137,7 +139,8 @@ def run(
             try:
                 payload = fetch_tournament_resource(client, tid, resource)
 
-                rows = {key(r): r for r in (row_mapper(tid, item) for item in payload)}
+                mapped = (row_mapper(tid, item) for item in payload)
+                rows = {key(r): r for r in mapped if r is not None}
                 batch = list(rows.values())
 
                 for start in range(0, len(batch), CHUNK_SIZE):

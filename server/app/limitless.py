@@ -168,7 +168,7 @@ def pairing_id(tournament_id: str, pairing: dict[str, Any]) -> str:
     return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()
 
 
-def to_pairing_row(tournament_id: str, pairing: dict[str, Any]) -> dict[str, Any]:
+def to_pairing_row(tournament_id: str, pairing: dict[str, Any]) -> dict[str, Any] | None:
     """Map an API pairing onto the public.pairings column names.
 
     `winner` arrives either as a username or as a bare integer (-1 or 0) that
@@ -178,8 +178,14 @@ def to_pairing_row(tournament_id: str, pairing: dict[str, Any]) -> dict[str, Any
     A bye is normally player1 with no player2, but some events record it the
     other way round - player2 only, and winning. That is restated as the
     usual shape, since player1 is the one side every row must have.
+
+    Some events also list empty table slots - no player on either side, winner
+    -1 (e.g. `{"round": 1, "phase": 1, "table": 3, "winner": -1, "games": {}}`).
+    They name nobody and record no match, so they map to None and are skipped.
     """
-    if "player1" not in pairing and pairing.get("player2"):
+    if not pairing.get("player1"):
+        if not pairing.get("player2"):
+            return None
         pairing = {**pairing, "player1": pairing["player2"], "player2": None}
 
     raw_winner = pairing.get("winner")

@@ -100,6 +100,13 @@ def test_bye_recorded_as_player2_only_is_restated_as_player1():
     assert row["id"] == to_pairing_row(TID, usual)["id"]
 
 
+def test_empty_table_slot_is_skipped():
+    """Some events list a table with no player on either side; it is no row."""
+    assert to_pairing_row(
+        TID, {"round": 1, "phase": 1, "table": 3, "winner": -1, "games": {}}
+    ) is None
+
+
 def test_integer_winner_becomes_result_code():
     """The API returns -1 (unpaired / no result) and 0 in the `winner` field."""
     unpaired = to_pairing_row(
