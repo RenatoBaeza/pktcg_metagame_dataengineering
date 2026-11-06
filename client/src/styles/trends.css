@@ -96,7 +96,7 @@
 
 .trend-chart {
   width: 100%;
-  min-height: 312px;
+  min-height: 338px;
 }
 
 .trend-chart svg {
@@ -146,6 +146,34 @@
 .trend-chart .crosshair {
   stroke: var(--text-muted);
   stroke-width: 1;
+}
+
+/* Releases are ink, like the line, and drawn under it: context for the data,
+   not a series. Dashed for a launch, solid for a rotation. */
+.trend-chart .release-rule {
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+}
+
+.trend-chart .launch .release-rule {
+  stroke-dasharray: 4 3;
+}
+
+.trend-chart .rotation .release-rule {
+  stroke: var(--text-primary);
+  stroke-width: 2;
+}
+
+/* Inter, not the pixel face: "30th Celebration" has a digit in it. */
+.trend-chart .release-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--text-secondary);
+}
+
+.trend-chart .rotation .release-label {
+  fill: var(--text-primary);
+  font-weight: 700;
 }
 
 .trend-chart .trend-line {
@@ -337,6 +365,85 @@
 
 .show-more:hover {
   border-color: var(--line);
+}
+
+/* ── releases in the grid ───────────────────────────────────────────────── */
+
+/* A cell is its own stacking context, so its rule stays under the sticky
+   headings when the grid scrolls beneath them. */
+.trend-grid td.cell {
+  isolation: isolate;
+}
+
+.release-rule {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 0;
+  margin-left: -1px;
+  pointer-events: none;
+  border-left: 2px dashed var(--text-secondary);
+}
+
+.release-rule.rotation {
+  border-left: 2px solid var(--text-primary);
+}
+
+/* Quieter where it crosses a tile, so the number under it still reads. */
+.trend-grid td .release-rule {
+  opacity: 0.6;
+}
+
+/* In the heading the rule starts under the label rather than through it, and
+   the label itself is set in full ink. */
+.trend-grid th .release-rule {
+  top: auto;
+  height: 8px;
+}
+
+.bucket-head.has-release {
+  color: var(--text-primary);
+}
+
+/* The key, and the swatch it shares with the tooltips: a short length of the
+   rule itself, laid on its side. */
+.release-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.release-key li,
+.tip-releases li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.release-swatch {
+  flex: none;
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed var(--text-secondary);
+}
+
+.release-swatch.rotation {
+  border-top: 2px solid var(--text-primary);
+}
+
+.tip-releases {
+  margin: -4px 0 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── tooltip additions ──────────────────────────────────────────────────── */

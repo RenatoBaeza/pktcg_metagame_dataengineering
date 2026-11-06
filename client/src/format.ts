@@ -47,6 +47,8 @@ export function createFormat(locale: string) {
       const start = day(from, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
       return `${start} – ${day(to, { day: "numeric", month: "short", year: "numeric" })}`;
     },
+    /** One calendar day: "May 22, 2026". */
+    calendarDay: (iso: string) => day(iso, { day: "numeric", month: "short", year: "numeric" }),
     /** A trend column's heading: "Sep 8" for a week, "Sep" for a month. */
     bucketLabel: (iso: string, grain: "week" | "month") =>
       day(iso, grain === "week" ? { day: "numeric", month: "short" } : { month: "short" }),

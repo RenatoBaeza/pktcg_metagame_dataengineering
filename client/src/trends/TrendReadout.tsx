@@ -4,6 +4,8 @@ import { DeckIcon } from "../components/DeckIcon";
 import { useI18n } from "../i18n";
 import type { Mode } from "../scale";
 import { scoreColor } from "../scale";
+import type { PlacedRelease } from "./releases";
+import { ReleaseList } from "./ReleaseMarks";
 
 type Rated = {
   matches: number;
@@ -18,7 +20,8 @@ type Rated = {
  * One matchup in one bucket, for the grid's and the chart's tooltips. Value
  * leads, labels follow, as in the matrix readout - plus the dates, since a
  * column heading names only where the bucket starts. A null bucket is the
- * whole window. A null cell is a bucket where the two did not meet.
+ * whole window. A null cell is a bucket where the two did not meet. Any set
+ * release or rotation inside the bucket is named under the dates.
  */
 export function TrendReadout({
   deckId,
@@ -29,6 +32,7 @@ export function TrendReadout({
   grain,
   cell,
   mode,
+  releases = [],
 }: {
   deckId: string;
   opponentId: string;
@@ -38,6 +42,7 @@ export function TrendReadout({
   grain: Grain;
   cell: Rated | null | undefined;
   mode: Mode;
+  releases?: PlacedRelease[];
 }) {
   const { t, count, percentSign, record, dateRange } = useI18n();
   const when = bucket
@@ -68,6 +73,7 @@ export function TrendReadout({
         {when}
         {bucket && !bucket.complete && <span className="muted"> · {t("partial")}</span>}
       </div>
+      <ReleaseList releases={releases} />
       {cell && cell.score_rate != null && (
         <dl>
           <dt>{t("recordTitle")}</dt>
