@@ -512,9 +512,9 @@ than it saved.
   the cell. The grid's cells are the matrix's cells (`scoreColor`, muted,
   dot for "did not meet"). Its "All" column is the `all` period's
   `gold_matchup_stats` cell, never a sum of the buckets.
-  Both draw set launches (dashed) and Standard rotations (solid) as vertical
-  ink rules at their day within the bucket, named above the chart, in a key
-  above the grid and in every tooltip. The list is hand-maintained in
+  Set launches and Standard rotations are marked quietly, at their day within
+  the bucket: a faint hairline named in small type on the chart, a short tick
+  under the column heading (named by its title) in the grid. The list is hand-maintained in
   `src/trends/releases.ts`, since nothing in the Limitless data says when a
   set came out - **add a row when a new set or rotation is announced**.
   Entries outside the window are simply not drawn.

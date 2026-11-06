@@ -8,8 +8,8 @@ import { useI18n } from "../i18n";
 import type { Mode } from "../scale";
 import { scoreColor } from "../scale";
 import { placeReleases, type PlacedRelease } from "./releases";
-import { ReleaseKey, useReleaseText } from "./ReleaseMarks";
 import { TrendReadout } from "./TrendReadout";
+import { useReleaseText } from "./useReleaseText";
 
 type Rate = Pick<TrendCell, "score_rate" | "score_low" | "score_high" | "matches">;
 
@@ -23,10 +23,8 @@ type Rate = Pick<TrendCell, "score_rate" | "score_low" | "score_high" | "matches
  * mostly thin (a median of two matches), and the muting is what keeps a 2-0
  * week from reading as a finding.
  *
- * A set release or rotation is a rule down its column, at its day within the
- * week or month - dashed for a launch, solid for a rotation, as in the chart.
- * A column is too narrow to name it, so a key above the grid does, and so do
- * the heading's and every cell's tooltips.
+ * A set release or rotation is a short tick under its column's heading, at
+ * its day within the week or month; the heading's title names it.
  *
  * A column whose bucket the window clips (the first and last, usually) has its
  * heading drawn quieter and says so in its tooltip.
@@ -72,7 +70,6 @@ export function TrendGrid({
 
   return (
     <>
-      <ReleaseKey releases={releases} />
       <div className="trend-scroll">
         <Grid
           key={version}
@@ -103,7 +100,6 @@ export function TrendGrid({
             grain={grain}
             cell={cell}
             mode={mode}
-            releases={bucket ? releases.filter((release) => release.index === hovered.c) : []}
           />
         </Tooltip>
       )}
@@ -145,17 +141,7 @@ const Grid = memo(function Grid({
   const deck = name(deckId);
   const { describe } = useReleaseText();
 
-  // Each column's releases, and the rules drawn through every cell in it.
   const inBucket = buckets.map((_, c) => releases.filter((release) => release.index === c));
-  const rules = (c: number) =>
-    inBucket[c].map((release) => (
-      <span
-        key={release.date + release.name}
-        className={`release-rule ${release.kind}`}
-        style={{ left: `${release.at * 100}%` }}
-        aria-hidden="true"
-      />
-    ));
 
   // One delegated listener for the whole grid rather than four per cell.
   const locate = (target: EventTarget) => {
@@ -225,12 +211,19 @@ const Grid = memo(function Grid({
               <th
                 key={bucket.bucket_start}
                 scope="col"
-                className={`bucket-head${bucket.complete ? "" : " partial"}${events.length ? " has-release" : ""}`}
+                className={`bucket-head${bucket.complete ? "" : " partial"}`}
                 title={[when, ...events].join("\n")}
               >
                 {label(bucket)}
                 {events.length > 0 && <span className="sr-only">{`, ${events.join(", ")}`}</span>}
-                {rules(c)}
+                {inBucket[c].map((release) => (
+                  <span
+                    key={release.date + release.name}
+                    className="release-tick"
+                    style={{ left: `${release.at * 100}%` }}
+                    aria-hidden="true"
+                  />
+                ))}
               </th>
             );
           })}
@@ -265,14 +258,12 @@ const Grid = memo(function Grid({
                   return (
                     <td key={bucket.bucket_start} className="cell empty" data-r={r} data-c={c}>
                       <div style={wave} title={t("noTrendCell", { row: deck, column: name(row), bucket: when })} />
-                      {rules(c)}
                     </td>
                   );
                 }
                 return (
                   <td key={bucket.bucket_start} className="cell" data-r={r} data-c={c}>
                     {paint(cell, wave, `${name(row)}, ${when}`, row)}
-                    {rules(c)}
                   </td>
                 );
               })}

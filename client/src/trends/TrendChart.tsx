@@ -5,21 +5,19 @@ import { spansEven } from "../format";
 import { useI18n } from "../i18n";
 import type { Mode } from "../scale";
 import { scoreColor } from "../scale";
-import { placeReleases, type PlacedRelease } from "./releases";
-import { useReleaseText } from "./ReleaseMarks";
+import { placeReleases } from "./releases";
 import { TrendReadout } from "./TrendReadout";
+import { useReleaseText } from "./useReleaseText";
 
-/** Two rows of release labels sit above the plot, so a crowded month can stagger them. */
-const RELEASE_ROWS = [11, 25];
-const PAD = { top: 38, right: 52, left: 44 };
+const PAD = { top: 24, right: 52, left: 44 };
 const PLOT_HEIGHT = 220;
 const STRIP_GAP = 16;
 const STRIP_HEIGHT = 40;
 const AXIS_HEIGHT = 24;
 const HEIGHT = PAD.top + PLOT_HEIGHT + STRIP_GAP + STRIP_HEIGHT + AXIS_HEIGHT;
 const LABEL_WIDTH = 58;
-/** Roughly how wide a release label's 11px characters run, to stagger the ones that would collide. */
-const RELEASE_CHAR = 6.4;
+/** Roughly how wide a release label's 10px characters run, to skip one that would collide. */
+const RELEASE_CHAR = 5.6;
 
 /**
  * One matchup's score rate, bucket by bucket - a single series, so no legend:
@@ -37,12 +35,10 @@ const RELEASE_CHAR = 6.4;
  * own scale. A second y-axis on the plot would invent a relation between the
  * two; a separate strip just says how much each point stands on.
  *
- * Set releases and rotations are vertical rules through the plot and the
- * strip, dashed for a launch and solid for a rotation, each named above the
- * plot (releases.ts). They are ink, like the line: an event is context for
- * the data, not a series of its own. A label that would collide with its
- * neighbours drops to a second row, and one that still fits nowhere is left
- * to the tooltip, which names every release in the bucket it reads out.
+ * A set release or rotation (releases.ts) is a faint hairline through the
+ * plot, named in small type above it - context for the data, not a series.
+ * A name that would run into the one before it is left off; its line keeps
+ * a native title.
  *
  * A crosshair snaps to the nearest bucket and reads it out. The arrow keys
  * move it when the chart has focus, and the grid below holds every value as
@@ -90,14 +86,15 @@ export function TrendChart({
   const x = (i: number) => PAD.left + band * (i + 0.5);
 
   const releases = useMemo(() => placeReleases(buckets, grain), [buckets, grain]);
-  const marks = layoutReleases(
-    releases.map((release) => ({
-      release,
-      x: PAD.left + band * (release.index + release.at),
-      text: releaseText.label(release),
-    })),
-    width,
-  );
+  let labelEnd = -Infinity;
+  const marks = releases.map((release) => {
+    const at = PAD.left + band * (release.index + release.at);
+    const text = releaseText.label(release);
+    const end = at + 3 + text.length * RELEASE_CHAR;
+    const labelled = at > labelEnd + 8 && end <= width;
+    if (labelled) labelEnd = end;
+    return { release, at, text: labelled ? text : null };
+  });
 
   const points = buckets.map((bucket) => series.get(bucket.bucket_start) ?? null);
   const rates = points.flatMap((cell) => (cell?.score_rate != null ? [cell.score_rate] : []));
@@ -227,23 +224,12 @@ export function TrendChart({
             <line x1={PAD.left} x2={PAD.left + plotWidth} y1={even} y2={even} className="even-rule" />
           )}
 
-          {marks.map(({ release, x: at, text, row, anchor }) => (
-            <g key={release.date + release.name} className={`release-mark ${release.kind}`}>
+          {marks.map(({ release, at, text }) => (
+            <g key={release.date + release.name} className="release-mark">
               <title>{releaseText.describe(release)}</title>
-              <line
-                x1={at}
-                x2={at}
-                y1={row == null ? plotTop : RELEASE_ROWS[row] + 4}
-                y2={stripBase}
-                className="release-rule"
-              />
-              {row != null && (
-                <text
-                  x={anchor === "start" ? at + 4 : at - 4}
-                  y={RELEASE_ROWS[row]}
-                  textAnchor={anchor}
-                  className="release-label"
-                >
+              <line x1={at} x2={at} y1={plotTop - 12} y2={plotBottom} className="release-rule" />
+              {text && (
+                <text x={at + 3} y={plotTop - 4} className="release-label">
                   {text}
                 </text>
               )}
@@ -328,32 +314,11 @@ export function TrendChart({
             grain={grain}
             cell={points[active.index]}
             mode={mode}
-            releases={releases.filter((release) => release.index === active.index)}
           />
         </Tooltip>
       )}
     </div>
   );
-}
-
-type Mark = { release: PlacedRelease; x: number; text: string };
-
-/**
- * Where each release label goes: beside its rule on the right, or the left
- * where the right would run off the chart, in the first row it fits without
- * touching the label before it. A null row is a rule with no label.
- */
-function layoutReleases(marks: Mark[], width: number) {
-  const ends = RELEASE_ROWS.map(() => -Infinity);
-  return marks.map((mark) => {
-    const span = mark.text.length * RELEASE_CHAR + 4;
-    const anchor: "start" | "end" = mark.x + span > width ? "end" : "start";
-    const left = anchor === "start" ? mark.x : mark.x - span;
-    const right = anchor === "start" ? mark.x + span : mark.x;
-    const row = ends.findIndex((end) => left > end + 6);
-    if (row >= 0) ends[row] = right;
-    return { ...mark, anchor, row: row >= 0 ? row : null };
-  });
 }
 
 /** A column rising from the baseline, square at the base and rounded at the cap. */
