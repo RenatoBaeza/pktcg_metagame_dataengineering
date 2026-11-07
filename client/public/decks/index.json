@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-04T13:46:49+00:00",
+  "generated_at": "2026-11-07T21:25:04+00:00",
   "sprite_source": "https://r2.limitlesstcg.net/pokemon/gen9",
   "decks": [
     {
@@ -1087,6 +1087,14 @@
         "manectric-mega"
       ],
       "image": "/decks/mega-manectric-ex-meg.png"
+    },
+    {
+      "id": "mega-rayquaza-ex",
+      "name": "Mega Rayquaza",
+      "icons": [
+        "rayquaza-mega"
+      ],
+      "image": "/decks/mega-rayquaza-ex.png"
     },
     {
       "id": "mega-sharpedo-ex",
