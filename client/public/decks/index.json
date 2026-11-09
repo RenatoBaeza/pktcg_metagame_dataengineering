@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-07T21:25:04+00:00",
+  "generated_at": "2026-11-09T04:03:31+00:00",
   "sprite_source": "https://r2.limitlesstcg.net/pokemon/gen9",
   "decks": [
     {
@@ -976,6 +976,14 @@
       "image": "/decks/mega-charizard-x-ex.png"
     },
     {
+      "id": "mega-charizard-y-ex",
+      "name": "Mega Charizard Y",
+      "icons": [
+        "charizard-mega-y"
+      ],
+      "image": "/decks/mega-charizard-y-ex.png"
+    },
+    {
       "id": "mega-darkrai-ex",
       "name": "Mega Darkrai",
       "icons": [
@@ -1079,6 +1087,14 @@
         "lucario-mega"
       ],
       "image": "/decks/mega-lucario-ex.png"
+    },
+    {
+      "id": "mega-malamar-ex",
+      "name": "Mega Malamar",
+      "icons": [
+        "malamar-mega"
+      ],
+      "image": "/decks/mega-malamar-ex.png"
     },
     {
       "id": "mega-manectric-ex-meg",
@@ -1498,6 +1514,15 @@
         "sylveon"
       ],
       "image": "/decks/sylveon-pre.png"
+    },
+    {
+      "id": "talonflame-dusknoir",
+      "name": "Talonflame Dusknoir",
+      "icons": [
+        "talonflame",
+        "dusknoir"
+      ],
+      "image": "/decks/talonflame-dusknoir.png"
     },
     {
       "id": "tera-box",
