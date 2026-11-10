@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-09T04:03:31+00:00",
+  "generated_at": "2026-11-10T14:10:58+00:00",
   "sprite_source": "https://r2.limitlesstcg.net/pokemon/gen9",
   "decks": [
     {
@@ -1523,6 +1523,14 @@
         "dusknoir"
       ],
       "image": "/decks/talonflame-dusknoir.png"
+    },
+    {
+      "id": "tapu-koko-spread",
+      "name": "Tapu Koko Spread",
+      "icons": [
+        "tapu-koko"
+      ],
+      "image": "/decks/tapu-koko-spread.png"
     },
     {
       "id": "tera-box",
