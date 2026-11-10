@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-10T14:10:58+00:00",
+  "generated_at": "2026-11-10T22:48:30+00:00",
   "sprite_source": "https://r2.limitlesstcg.net/pokemon/gen9",
   "decks": [
     {
@@ -856,6 +856,14 @@
         "brute-bonnet"
       ],
       "image": "/decks/klawf-par.png"
+    },
+    {
+      "id": "koraidon-ex",
+      "name": "Koraidon",
+      "icons": [
+        "koraidon"
+      ],
+      "image": "/decks/koraidon-ex.png"
     },
     {
       "id": "lillie-clefairy",
