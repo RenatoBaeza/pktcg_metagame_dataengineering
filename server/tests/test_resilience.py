@@ -71,6 +71,27 @@ def test_send_gives_up_after_max_attempts():
     assert client.calls == supabase.MAX_ATTEMPTS
 
 
+def _error(status_code, text):
+    response = FakeResponse(status_code)
+    response.text = text
+    return response
+
+
+def test_send_retries_statement_timeout():
+    """PostgREST reports a statement timeout as a 500 carrying code 57014."""
+    timeout = _error(500, '{"code":"57014","message":"canceling statement due to statement timeout"}')
+    client = FakeClient([timeout, FakeResponse(200)])
+    assert supabase._send(client, "POST", "http://example/rpc/x").status_code == 200
+    assert client.calls == 2
+
+
+def test_send_does_not_retry_other_500():
+    """Any other 500 is a real error in the statement - surface it at once."""
+    client = FakeClient([_error(500, '{"code":"42703","message":"column does not exist"}')])
+    assert supabase._send(client, "POST", "http://example/rpc/x").status_code == 500
+    assert client.calls == 1
+
+
 def test_send_does_not_retry_client_error():
     """A 400 is our bug, not a blip - surface it immediately."""
     client = FakeClient([FakeResponse(400)])

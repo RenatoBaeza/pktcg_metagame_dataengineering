@@ -19,9 +19,24 @@ BACKOFF_SECONDS = 2.0
 # are both idempotent.
 TRANSIENT_STATUS = {502, 503, 504, 408, 429}
 
+# Postgres's "canceling statement due to statement timeout", which PostgREST
+# returns as a plain 500. Any other 500 is a real error (a bad statement, a
+# constraint) and is surfaced at once, but this one is the database host
+# stalling: the same refresh call that times out at 8s runs in a fraction of a
+# second a minute later. Retrying is safe - every refresh function is one
+# transaction, rolled back whole when it is cancelled.
+STATEMENT_TIMEOUT = "57014"
+
+
+def _is_transient(response: httpx.Response) -> bool:
+    if response.status_code in TRANSIENT_STATUS:
+        return True
+    return response.status_code == 500 and STATEMENT_TIMEOUT in response.text
+
 
 def _send(client: httpx.Client, method: str, url: str, **kwargs: Any) -> httpx.Response:
-    """Issue a request, retrying timeouts, connection drops and 5xx."""
+    """Issue a request, retrying timeouts, connection drops, gateway 5xx and
+    statement timeouts."""
     last_error: Exception | None = None
 
     for attempt in range(MAX_ATTEMPTS):
@@ -33,7 +48,7 @@ def _send(client: httpx.Client, method: str, url: str, **kwargs: Any) -> httpx.R
             last_error = exc
             continue
 
-        if response.status_code in TRANSIENT_STATUS and attempt < MAX_ATTEMPTS - 1:
+        if _is_transient(response) and attempt < MAX_ATTEMPTS - 1:
             last_error = RuntimeError(f"HTTP {response.status_code}")
             continue
         return response
