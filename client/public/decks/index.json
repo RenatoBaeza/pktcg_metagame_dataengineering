@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-10T22:48:30+00:00",
+  "generated_at": "2026-11-14T12:57:24+00:00",
   "sprite_source": "https://r2.limitlesstcg.net/pokemon/gen9",
   "decks": [
     {
@@ -400,6 +400,15 @@
         "iron-thorns"
       ],
       "image": "/decks/dragapult-iron-thorns.png"
+    },
+    {
+      "id": "dragapult-toucannon",
+      "name": "Dragapult Toucannon",
+      "icons": [
+        "dragapult",
+        "toucannon"
+      ],
+      "image": "/decks/dragapult-toucannon.png"
     },
     {
       "id": "dragapult-zoroark",
