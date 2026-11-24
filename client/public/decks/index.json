@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T12:57:24+00:00",
+  "generated_at": "2026-11-24T16:52:57+00:00",
   "sprite_source": "https://r2.limitlesstcg.net/pokemon/gen9",
   "decks": [
     {
@@ -1064,6 +1064,14 @@
         "gengar-mega"
       ],
       "image": "/decks/mega-gengar-ex.png"
+    },
+    {
+      "id": "mega-golisopod-ex",
+      "name": "Mega Golisopod",
+      "icons": [
+        "golisopod-mega"
+      ],
+      "image": "/decks/mega-golisopod-ex.png"
     },
     {
       "id": "mega-greninja-ex",
